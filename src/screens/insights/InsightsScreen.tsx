@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -9,11 +9,20 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { FeedCardView } from '@/components/insights/FeedCard';
-import { generateFeedCards } from '@/lib/feedGenerator';
+import { HeroCard } from '@/components/insights/HeroCard';
+import { InsightCard } from '@/components/insights/InsightCard';
+import { MetricCard } from '@/components/insights/MetricCard';
+import { SectionHeader } from '@/components/insights/SectionHeader';
+import { HorizontalCarousel } from '@/components/insights/HorizontalCarousel';
+import { generateFeedSections, generateTrendMetrics } from '@/lib/feedGenerator';
 import { useAppStore } from '@/store/useAppStore';
 import { RootStackParamList } from '@/types';
+
+const CARD_WIDTH = 160;
+const COMPACT_CARD_WIDTH = 140;
+const METRIC_CARD_WIDTH = 130;
 
 export function InsightsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -22,7 +31,13 @@ export function InsightsScreen() {
   const getTodayEntry = useAppStore((s) => s.getTodayEntry);
   const todayEntry = getTodayEntry();
 
-  const cards = useMemo(() => generateFeedCards(entries), [entries.length]);
+  const sections = useMemo(() => generateFeedSections(entries), [entries.length]);
+  const trendMetrics = useMemo(() => generateTrendMetrics(entries), [entries.length]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const handleCardPress = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -33,29 +48,19 @@ export function InsightsScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Today's Frame at top */}
         {todayEntry && (
           <View style={styles.frameCard}>
             <Text style={styles.frameEyebrow}>Today's Frame</Text>
             <Text style={styles.frameTitle}>{todayEntry.generated_frame ?? 'Your Frame'}</Text>
-            <Text style={styles.frameSub}>{todayEntry.generated_frame_sub}</Text>
+            {todayEntry.generated_frame_sub && (
+              <Text style={styles.frameSub}>{todayEntry.generated_frame_sub}</Text>
+            )}
           </View>
         )}
 
-        {/* Check-in summary if exists */}
-        {todayEntry && (
-          <View style={styles.summaryRow}>
-            <SummaryPill label="Sleep" value={`${todayEntry.sleep_hours}h`} />
-            <SummaryPill label="Mood" value={['😞', '😕', '😐', '🙂', '😊'][todayEntry.mood - 1]} />
-            <SummaryPill label="Energy" value={`${todayEntry.energy}/10`} />
-            <SummaryPill label="Activity" value={todayEntry.activity} />
-          </View>
-        )}
-
-        {/* Check-in CTA if no entry */}
         {!todayEntry && (
           <TouchableOpacity
             style={styles.checkInCta}
@@ -66,20 +71,71 @@ export function InsightsScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Feed */}
-        {cards.map((card) => (
-          <FeedCardView key={card.id} card={card} />
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
+        {sections.map((section) => {
+          if (section.key === 'hero') {
+            const heroCard = section.cards[0];
+            return (
+              <View key={section.key} style={{ paddingHorizontal: 20 }}>
+                <HeroCard
+                  card={heroCard}
+                  onPress={() => handleCardPress(heroCard.id)}
+                />
+              </View>
+            );
+          }
 
-function SummaryPill({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.pill}>
-      <Text style={styles.pillLabel}>{label}</Text>
-      <Text style={styles.pillValue}>{value}</Text>
+          if (section.key === 'trending' && trendMetrics.length > 0) {
+            return (
+              <View key={section.key} style={{ paddingHorizontal: 20 }}>
+                <SectionHeader title={section.title} />
+                <HorizontalCarousel cardWidth={METRIC_CARD_WIDTH} gap={10}>
+                  {trendMetrics.map((m, i) => (
+                    <MetricCard key={i} {...m} />
+                  ))}
+                </HorizontalCarousel>
+              </View>
+            );
+          }
+
+          if (section.cards.length === 0) return null;
+
+          const expandedCard = section.cards.find((c) => expandedId === c.id);
+          const carouselCards = section.cards.filter((c) => expandedId !== c.id);
+
+          return (
+            <View key={section.key}>
+              {carouselCards.length > 0 && (
+                <View style={{ paddingHorizontal: 20 }}>
+                  <SectionHeader title={section.title} subtitle={section.subtitle} />
+                  <HorizontalCarousel
+                    cardWidth={section.layout === 'horizontal-compact' ? COMPACT_CARD_WIDTH : CARD_WIDTH}
+                    gap={12}
+                  >
+                    {carouselCards.map((card) => (
+                      <InsightCard
+                        key={card.id}
+                        card={card}
+                        variant={section.layout === 'horizontal-compact' ? 'compact' : 'standard'}
+                        onPress={() => handleCardPress(card.id)}
+                      />
+                    ))}
+                  </HorizontalCarousel>
+                </View>
+              )}
+              {expandedCard && (
+                <View style={styles.expandedCardWrap}>
+                  <SectionHeader title={section.title} subtitle={section.subtitle} />
+                  <FeedCardView
+                    card={expandedCard}
+                    isExpanded={true}
+                    onToggle={() => handleCardPress(expandedCard.id)}
+                  />
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -90,50 +146,57 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg,
   },
   header: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 6,
     gap: 4,
   },
   headerTitle: {
-    fontSize: Typography['2xl'],
+    fontSize: Typography['3xl'],
     fontWeight: Typography.semibold,
     color: Colors.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   headerSub: {
     fontSize: Typography.sm,
     color: Colors.textTertiary,
+    letterSpacing: 0.1,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.md,
-    gap: Spacing.md,
+    paddingTop: 16,
+    paddingBottom: 20,
+    gap: 28,
   },
   frameCard: {
+    marginHorizontal: 20,
     backgroundColor: Colors.bgCard,
-    borderRadius: Radius.lg,
+    borderRadius: 20,
     borderWidth: 0.5,
-    borderColor: Colors.border,
-    padding: Spacing.xl,
-    gap: Spacing.sm,
+    borderColor: Colors.accent + '28',
+    padding: 24,
+    gap: 8,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   frameEyebrow: {
     fontSize: Typography.xs,
     color: Colors.accent,
-    fontWeight: Typography.medium,
+    fontWeight: Typography.semibold,
     textTransform: 'uppercase',
-    letterSpacing: 0.1,
+    letterSpacing: 1,
   },
   frameTitle: {
-    fontSize: Typography['2xl'],
+    fontSize: Typography.xl,
     fontWeight: Typography.semibold,
     color: Colors.textPrimary,
-    letterSpacing: -0.5,
-    lineHeight: Typography['2xl'] * Typography.tight,
+    letterSpacing: -0.4,
+    lineHeight: Typography.xl * 1.3,
   },
   frameSub: {
     fontSize: Typography.sm,
@@ -141,41 +204,25 @@ const styles = StyleSheet.create({
     lineHeight: Typography.sm * Typography.normal,
     marginTop: 2,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  pill: {
-    flex: 1,
-    backgroundColor: Colors.bgCard,
-    borderRadius: Radius.md,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    alignItems: 'center',
-    gap: 2,
-  },
-  pillLabel: {
-    fontSize: Typography.xs,
-    color: Colors.textTertiary,
-    fontWeight: Typography.medium,
-  },
-  pillValue: {
-    fontSize: Typography.sm,
-    fontWeight: Typography.semibold,
-    color: Colors.textPrimary,
-    textTransform: 'capitalize',
-  },
   checkInCta: {
+    marginHorizontal: 20,
     backgroundColor: Colors.accent,
-    borderRadius: Radius.lg,
-    paddingVertical: 16,
+    borderRadius: 20,
+    paddingVertical: 18,
     alignItems: 'center',
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   checkInCtaText: {
     fontSize: Typography.md,
     fontWeight: Typography.semibold,
     color: '#fff',
+  },
+  expandedCardWrap: {
+    paddingHorizontal: 20,
+    gap: 10,
   },
 });

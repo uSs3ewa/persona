@@ -62,16 +62,29 @@ export interface Insight {
   type: InsightType;
 }
 
+export type FeedCardSection =
+  | 'hero'
+  | 'trending'
+  | 'insights'
+  | 'recovery'
+  | 'mind'
+  | 'training'
+  | 'nutrition'
+  | 'science'
+  | 'coach';
+
 export interface FeedCard {
   id: string;
   style: FeedCardStyle;
-  title: string;
-  subtitle?: string;
-  body: string;
   icon: string;
   accentColor: string;
+  hook: string;
+  expandedContent: string;
+  category?: string;
+  section?: FeedCardSection;
   badge?: string;
   priority?: number;
+  metric?: { label: string; value: string; change?: string; trend?: 'up' | 'down' | 'flat' };
 }
 
 // ─── Draft ────────────────────────────────────────────────────────────────────
