@@ -1,8 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
-import React, { useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { StepShell } from '@/components/checkin/StepShell';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { CheckInParamList } from '@/navigation/CheckInNavigator';
@@ -24,7 +24,6 @@ export function EnergyStep() {
   const navigation = useNavigation<NativeStackNavigationProp<CheckInParamList>>();
   const { checkInDraft, setCheckInDraft } = useAppStore();
   const energy = checkInDraft.energy;
-  const [trackWidth, setTrackWidth] = useState(0);
   const lastHaptic = useRef<EnergyLevel | undefined>(undefined);
 
   const select = (val: EnergyLevel) => {
@@ -35,27 +34,6 @@ export function EnergyStep() {
     }
     setCheckInDraft({ energy: val });
   };
-
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 2 || Math.abs(g.dy) > 2,
-        onPanResponderGrant: (evt) => {
-          if (trackWidth <= 0) return;
-          const x = evt.nativeEvent.locationX;
-          const level = Math.min(10, Math.max(1, Math.round((x / trackWidth) * 10))) as EnergyLevel;
-          select(level);
-        },
-        onPanResponderMove: (evt) => {
-          if (trackWidth <= 0) return;
-          const x = evt.nativeEvent.locationX;
-          const level = Math.min(10, Math.max(1, Math.round((x / trackWidth) * 10))) as EnergyLevel;
-          select(level);
-        },
-      }),
-    [trackWidth, energy]
-  );
 
   return (
     <StepShell
@@ -74,39 +52,33 @@ export function EnergyStep() {
         </View>
       )}
 
-      <View
-        style={styles.track}
-        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-        {...pan.panHandlers}
-      >
-        <View style={styles.grid}>
+      <View style={styles.track}>
+        <View style={styles.columns}>
           {LEVELS.map((level) => {
             const filled = energy !== undefined && level <= energy;
             const active = energy === level;
             return (
-              <View
+              <Pressable
                 key={level}
-                style={[
-                  styles.bar,
-                  { height: 24 + level * 4 },
-                  filled && styles.barFilled,
-                  active && styles.barActive,
-                ]}
-              />
+                style={styles.column}
+                onPress={() => select(level)}
+              >
+                <View style={styles.barWrap}>
+                  <View
+                    style={[
+                      styles.bar,
+                      { height: 24 + level * 4 },
+                      filled && styles.barFilled,
+                      active && styles.barActive,
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.tapTarget, active && styles.tapTargetActive]}>
+                  {level}
+                </Text>
+              </Pressable>
             );
           })}
-        </View>
-
-        <View style={styles.tapRow}>
-          {LEVELS.map((level) => (
-            <Text
-              key={level}
-              onPress={() => select(level)}
-              style={[styles.tapTarget, energy === level && styles.tapTargetActive]}
-            >
-              {level}
-            </Text>
-          ))}
         </View>
       </View>
     </StepShell>
@@ -139,15 +111,18 @@ const styles = StyleSheet.create({
   track: {
     paddingVertical: Spacing.md,
   },
-  grid: {
+  columns: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
     gap: 6,
+  },
+  column: {
+    flex: 1,
+  },
+  barWrap: {
     height: 80,
-    marginBottom: Spacing.md,
+    justifyContent: 'flex-end',
   },
   bar: {
-    flex: 1,
     borderRadius: 4,
     backgroundColor: Colors.bgCard,
     borderWidth: 0.5,
@@ -161,12 +136,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     borderColor: Colors.accent,
   },
-  tapRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
   tapTarget: {
-    flex: 1,
     textAlign: 'center',
     fontSize: Typography.sm,
     color: Colors.textTertiary,
