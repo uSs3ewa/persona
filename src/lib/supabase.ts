@@ -4,7 +4,25 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+function isValidSupabaseUrl(url: string): boolean {
+  if (!url.startsWith('https://')) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.endsWith('.supabase.co');
+  } catch {
+    return false;
+  }
+}
+
+function isValidAnonKey(key: string): boolean {
+  if (key.length < 20) return false;
+  if (key.startsWith('your-')) return false;
+  const parts = key.split('.');
+  return parts.length === 3;
+}
+
+export const isSupabaseConfigured =
+  isValidSupabaseUrl(SUPABASE_URL) && isValidAnonKey(SUPABASE_ANON_KEY);
 
 export const supabase =
   isSupabaseConfigured

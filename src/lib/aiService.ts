@@ -1,14 +1,19 @@
 import { CheckInDraft, DailyEntry, Insight } from '@/types';
 import { isSupabaseConfigured, supabase } from './supabase';
 
-interface AIResponse {
+const AI_ENABLED = false;
+
+interface FrameResponse {
   frame_title: string;
   frame_sub: string;
+}
+
+interface InsightsResponse {
   insights: Insight[];
 }
 
-function normalizeResponse(draft: CheckInDraft, raw: unknown): AIResponse {
-  const fallback = localFallback(draft);
+function normalizeFrame(draft: CheckInDraft, raw: unknown): FrameResponse {
+  const fallback = localFrameFallback(draft);
   const obj = raw as any;
 
   const frame_title =
@@ -20,26 +25,29 @@ function normalizeResponse(draft: CheckInDraft, raw: unknown): AIResponse {
       ? obj.frame_sub.trim()
       : fallback.frame_sub;
 
-  const insights: Insight[] = Array.isArray(obj?.insights)
-    ? obj.insights
-        .filter(
-          (x: any) =>
-            x &&
-            typeof x.title === 'string' &&
-            typeof x.body === 'string' &&
-            typeof x.type === 'string'
-        )
-        .map((x: any) => ({
-          title: String(x.title),
-          body: String(x.body),
-          type: x.type as Insight['type'],
-        }))
-    : fallback.insights;
-
-  return { frame_title, frame_sub, insights };
+  return { frame_title, frame_sub };
 }
 
-function localFallback(draft: CheckInDraft): AIResponse {
+function normalizeInsights(raw: unknown): Insight[] {
+  const obj = raw as any;
+  if (!Array.isArray(obj?.insights)) return [];
+
+  return obj.insights
+    .filter(
+      (x: any) =>
+        x &&
+        typeof x.title === 'string' &&
+        typeof x.body === 'string' &&
+        typeof x.type === 'string'
+    )
+    .map((x: any) => ({
+      title: String(x.title),
+      body: String(x.body),
+      type: x.type as Insight['type'],
+    }));
+}
+
+export function localInsightFallback(draft: CheckInDraft): Insight[] {
   const sleep = draft.sleep_hours ?? 7;
   const mood = draft.mood ?? 3;
   const energy = draft.energy ?? 5;
@@ -92,6 +100,14 @@ function localFallback(draft: CheckInDraft): AIResponse {
     });
   }
 
+  return insights;
+}
+
+function localFrameFallback(draft: CheckInDraft): FrameResponse {
+  const sleep = draft.sleep_hours ?? 7;
+  const mood = draft.mood ?? 3;
+  const energy = draft.energy ?? 5;
+
   let frame_title = 'Steady State';
   let frame_sub = 'Your inputs are balanced today. Aim for progress without forcing output.';
 
@@ -106,26 +122,79 @@ function localFallback(draft: CheckInDraft): AIResponse {
     frame_sub = 'You have extra fuel. Push high-value work, but keep it structured.';
   }
 
-  return { frame_title, frame_sub, insights };
+  return { frame_title, frame_sub };
 }
 
 export async function generateFrame(
   draft: CheckInDraft,
   recentEntries: DailyEntry[]
-): Promise<AIResponse> {
-  if (!isSupabaseConfigured) {
-    return normalizeResponse(draft, null);
+): Promise<FrameResponse> {
+  if (!AI_ENABLED || !isSupabaseConfigured) {
+    if (__DEV__) console.log('[AI:Frame] Using local fallback (AI_ENABLED=' + AI_ENABLED + ')');
+    return normalizeFrame(draft, null);
   }
   try {
+    if (__DEV__) console.log('[AI:Frame] Invoking generate-frame');
     const { data, error } = await supabase.functions.invoke('generate-frame', {
       body: { draft, recentEntries },
     });
 
-    if (error) throw error;
-    if (!data) throw new Error('No AI payload returned');
-    return normalizeResponse(draft, data);
-  } catch (e) {
-    if (__DEV__) console.warn('AI failed:', e);
-    return normalizeResponse(draft, null);
+    if (error) {
+      if (__DEV__) console.error('[AI:Frame] Edge Function error:', {
+        message: error.message,
+        status: (error as any).status,
+      });
+      throw error;
+    }
+    if (!data) throw new Error('No frame payload returned');
+    if (__DEV__) console.log('[AI:Frame] Response received');
+    return normalizeFrame(draft, data);
+  } catch (e: any) {
+    if (__DEV__) console.error('[AI:Frame] Failed:', {
+      name: e?.name,
+      message: e?.message,
+      status: e?.status,
+    });
+    return normalizeFrame(draft, null);
+  }
+}
+
+export async function generateInsights(
+  today: DailyEntry,
+  recentEntries: DailyEntry[]
+): Promise<Insight[]> {
+  if (!AI_ENABLED || !isSupabaseConfigured) {
+    if (__DEV__) console.log('[AI:Insights] Using local fallback (AI_ENABLED=' + AI_ENABLED + ')');
+    return localInsightFallback(today);
+  }
+  try {
+    if (__DEV__) console.log('[AI:Insights] Invoking generate-insights');
+    const { data, error } = await supabase.functions.invoke('generate-insights', {
+      body: {
+        today,
+        recent7: recentEntries.slice(0, 7),
+        recent30: recentEntries.slice(0, 30),
+      },
+    });
+
+    if (error) {
+      if (__DEV__) console.error('[AI:Insights] Edge Function error:', {
+        message: error.message,
+        status: (error as any).status,
+      });
+      throw error;
+    }
+    if (!data) throw new Error('No insights payload returned');
+
+    const insights = normalizeInsights(data);
+    if (__DEV__) console.log(`[AI:Insights] Received ${insights.length} insights`);
+    return insights;
+  } catch (e: any) {
+    if (__DEV__) console.error('[AI:Insights] Failed:', {
+      name: e?.name,
+      message: e?.message,
+      status: e?.status,
+    });
+    return localInsightFallback(today);
   }
 }

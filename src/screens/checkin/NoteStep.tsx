@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StepShell } from '@/components/checkin/StepShell';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { generateFrame } from '@/lib/aiService';
+import { generateFrame, generateInsights } from '@/lib/aiService';
 import { RootStackParamList } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
 import { computeStateScore, todayISO } from '@/utils/stateScore';
@@ -31,9 +31,12 @@ export function NoteStep() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const aiResult = await generateFrame(checkInDraft, entries.slice(0, 5));
+      const frameResult = await generateFrame(checkInDraft, entries.slice(0, 5));
 
-      const entry_date = editingEntryId ? (entries.find((e) => e.id === editingEntryId)?.entry_date ?? todayISO()) : todayISO();
+      const entry_date = editingEntryId
+        ? (entries.find((e) => e.id === editingEntryId)?.entry_date ?? todayISO())
+        : todayISO();
+
       const base: DailyEntry = {
         id: editingEntryId ?? Date.now().toString(),
         user_id: user?.id ?? 'local',
@@ -45,9 +48,9 @@ export function NoteStep() {
         activity: checkInDraft.activity ?? 'none',
         nutrition: checkInDraft.nutrition ?? 'ok',
         note: checkInDraft.note,
-        generated_frame: aiResult.frame_title,
-        generated_frame_sub: aiResult.frame_sub,
-        generated_insights: aiResult.insights ?? [],
+        generated_frame: frameResult.frame_title,
+        generated_frame_sub: frameResult.frame_sub,
+        generated_insights: [],
         state_score: computeStateScore(checkInDraft),
         created_at: new Date().toISOString(),
       };
@@ -60,6 +63,12 @@ export function NoteStep() {
       }
       resetCheckInDraft();
       navigation.replace('FrameReveal', { entry: base });
+
+      generateInsights(base, entries.slice(0, 30)).then((insights) => {
+        if (insights.length > 0) {
+          updateEntry(base.id, { generated_insights: insights });
+        }
+      });
     } catch (e) {
       setErrorMsg('Could not generate your frame. Please try again.');
       setLoading(false);

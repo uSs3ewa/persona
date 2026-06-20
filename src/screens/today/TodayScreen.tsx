@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InsightCard } from '@/components/today/InsightCard';
 import { FrameCard } from '@/components/today/FrameCard';
 import { WeekTimeline } from '@/components/today/WeekTimeline';
 import { Colors, Spacing, Typography } from '@/constants/theme';
@@ -26,23 +25,19 @@ export function TodayScreen() {
   const startEditingEntry = useAppStore((s) => s.startEditingEntry);
   const todayEntry = hasHydrated ? getTodayEntry() : undefined;
 
-  // Load mock data on first run (dev convenience)
   useEffect(() => {
     if (!hasHydrated) return;
     if (__DEV__ && entries.length === 0) loadMockData();
   }, [hasHydrated]);
 
   const hasCheckedIn = todayEntry !== undefined;
-  const insights = todayEntry?.generated_insights ?? [];
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.logoText}>FRAME</Text>
       </View>
 
-      {/* Week timeline */}
       <WeekTimeline />
 
       <ScrollView
@@ -54,10 +49,8 @@ export function TodayScreen() {
           <LoadingToday />
         ) : hasCheckedIn ? (
           <>
-            {/* Frame card */}
             <FrameCard entry={todayEntry} />
 
-            {/* Check-in summary */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionLabel}>Today's Check-in</Text>
@@ -74,16 +67,6 @@ export function TodayScreen() {
               </View>
               <CheckInSummary entry={todayEntry} />
             </View>
-
-            {/* Insights feed */}
-            {insights.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Insights for you</Text>
-                {insights.map((insight, i) => (
-                  <InsightCard key={i} insight={insight} />
-                ))}
-              </View>
-            )}
           </>
         ) : (
           <EmptyToday onStartCheckIn={() => navigation.navigate('CheckIn')} />
@@ -98,7 +81,6 @@ function LoadingToday() {
     <View style={styles.loadingWrap}>
       <View style={[styles.skeleton, { width: '40%', height: 18 }]} />
       <View style={[styles.skeleton, { width: '100%', height: 120 }]} />
-      <View style={[styles.skeleton, { width: '100%', height: 90 }]} />
       <View style={[styles.skeleton, { width: '100%', height: 90 }]} />
     </View>
   );
@@ -213,7 +195,6 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   emptyWrap: {
-    flex: 1,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing['3xl'],
     gap: Spacing.lg,

@@ -56,14 +56,24 @@ All screens work offline — Supabase sync is additive, not required.
 
 1. Create a project at supabase.com
 2. Run `supabase/schema.sql` in the SQL editor
-3. Deploy the Edge Function: `supabase functions deploy generate-frame`
-4. Set `OPENAI_API_KEY` in Supabase secrets
-5. Add `.env` credentials
+3. Set `OPENAI_API_KEY` in Supabase Edge Function secrets:
+   ```bash
+   supabase secrets set OPENAI_API_KEY=sk-...
+   ```
+4. Deploy the Edge Function: `supabase functions deploy generate-frame`
+5. Copy `.env.example` to `.env` and fill in your Supabase project URL + anon key
+
+### Required Supabase secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `OPENAI_API_KEY` | OpenAI API key for LLM generation |
+| `OPENAI_MODEL` | *(optional)* Model override, defaults to `gpt-4o-mini` |
 
 ## Edge Function
 
 The AI call runs server-side at `supabase/functions/generate-frame/index.ts`.
-The full implementation is included as a comment in `src/lib/aiService.ts`.
+It calls OpenAI with the user's check-in data and returns a personalized Frame.
 
 ## Design tokens
 

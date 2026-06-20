@@ -21,9 +21,11 @@ const TYPE_COLOR: Record<InsightType, string> = {
 
 interface InsightCardProps {
   insight: Insight;
+  confidence?: number;
+  priority?: 'high' | 'medium' | 'low';
 }
 
-export function InsightCard({ insight }: InsightCardProps) {
+export function InsightCard({ insight, confidence, priority }: InsightCardProps) {
   const color = TYPE_COLOR[insight.type];
   const icon = TYPE_ICON[insight.type];
 
@@ -33,8 +35,20 @@ export function InsightCard({ insight }: InsightCardProps) {
         <Text style={[styles.icon, { color }]}>{icon}</Text>
       </View>
       <View style={styles.text}>
-        <Text style={styles.title}>{insight.title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{insight.title}</Text>
+          {priority === 'high' && (
+            <View style={styles.priorityBadge}>
+              <Text style={styles.priorityText}>!</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.body}>{insight.body}</Text>
+        {confidence !== undefined && confidence > 0 && (
+          <Text style={styles.confidence}>
+            {Math.round(confidence * 100)}% confidence
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -64,15 +78,38 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   title: {
     fontSize: Typography.base,
     fontWeight: Typography.medium,
     color: Colors.textPrimary,
     lineHeight: Typography.base * Typography.tight,
   },
+  priorityBadge: {
+    backgroundColor: Colors.danger + '20',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priorityText: {
+    fontSize: 10,
+    fontWeight: Typography.semibold,
+    color: Colors.danger,
+  },
   body: {
     fontSize: Typography.sm,
     color: Colors.textSecondary,
     lineHeight: Typography.sm * Typography.normal,
+  },
+  confidence: {
+    fontSize: Typography.xs,
+    color: Colors.textTertiary,
+    marginTop: 2,
   },
 });

@@ -1,6 +1,6 @@
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { RootStackParamList } from '@/types';
+import { Insight, RootStackParamList } from '@/types';
 import { InsightCard } from '@/components/today/InsightCard';
+import { generateInsights } from '@/lib/aiService';
+import { useAppStore } from '@/store/useAppStore';
 
 type FrameRevealRouteProp = RouteProp<RootStackParamList, 'FrameReveal'>;
 
@@ -20,8 +22,13 @@ export function FrameRevealScreen() {
   const { params } = useRoute<FrameRevealRouteProp>();
   const entry = params?.entry;
   const insets = useSafeAreaInsets();
+  const updateEntry = useAppStore((s) => s.updateEntry);
+  const entries = useAppStore((s) => s.entries);
+  const [liveInsights, setLiveInsights] = useState<Insight[]>(
+    entry?.generated_insights ?? []
+  );
+  const fetchedRef = useRef(false);
 
-  // Fade-in animation
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(24)).current;
 
@@ -36,6 +43,19 @@ export function FrameRevealScreen() {
       }),
     ]).start();
   }, []);
+
+  useEffect(() => {
+    if (!entry || fetchedRef.current) return;
+    if (liveInsights.length > 0) return;
+
+    fetchedRef.current = true;
+    generateInsights(entry, entries.slice(0, 30)).then((insights) => {
+      if (insights.length > 0) {
+        setLiveInsights(insights);
+        updateEntry(entry.id, { generated_insights: insights });
+      }
+    });
+  }, [entry?.id]);
 
   if (!entry) {
     return (
@@ -69,10 +89,10 @@ export function FrameRevealScreen() {
           <Text style={styles.frameTitle}>{entry.generated_frame ?? 'Your Frame'}</Text>
           <Text style={styles.frameSub}>{entry.generated_frame_sub}</Text>
 
-          {(entry.generated_insights ?? []).length > 0 && (
+          {liveInsights.length > 0 && (
             <View style={styles.insightsSection}>
               <Text style={styles.insightsLabel}>Insights</Text>
-              {(entry.generated_insights ?? []).map((insight, i) => (
+              {liveInsights.map((insight, i) => (
                 <InsightCard key={i} insight={insight} />
               ))}
             </View>

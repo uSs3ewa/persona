@@ -1,0 +1,8 @@
+[project]
+id = "persona-frame-yourself"
+
+[functions.generate-frame]
+verify_jwt = false
+
+[functions.generate-insights]
+verify_jwt = false

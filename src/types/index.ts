@@ -6,6 +6,36 @@ export type ActivityLevel = 'none' | 'light' | 'medium' | 'hard';
 export type NutritionLevel = 'poor' | 'ok' | 'good';
 export type InsightType = 'recovery' | 'focus' | 'energy' | 'nutrition' | 'pattern';
 
+export type FeedCardStyle =
+  | 'observation'
+  | 'pattern'
+  | 'trend'
+  | 'recovery'
+  | 'sleep'
+  | 'mood'
+  | 'productivity'
+  | 'nutrition'
+  | 'training'
+  | 'focus'
+  | 'stress'
+  | 'burnout'
+  | 'hydration'
+  | 'psychology'
+  | 'neuroscience'
+  | 'habit'
+  | 'motivation'
+  | 'weekly'
+  | 'monthly'
+  | 'coach'
+  | 'fact'
+  | 'didyouknow'
+  | 'experiment'
+  | 'challenge'
+  | 'achievement'
+  | 'reflection'
+  | 'prediction'
+  | 'warning';
+
 // ─── Core models ──────────────────────────────────────────────────────────────
 
 export interface DailyEntry {
@@ -30,6 +60,18 @@ export interface Insight {
   title: string;
   body: string;
   type: InsightType;
+}
+
+export interface FeedCard {
+  id: string;
+  style: FeedCardStyle;
+  title: string;
+  subtitle?: string;
+  body: string;
+  icon: string;
+  accentColor: string;
+  badge?: string;
+  priority?: number;
 }
 
 // ─── Draft ────────────────────────────────────────────────────────────────────
@@ -65,6 +107,6 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Today: undefined;
-  Add: undefined;
+  Insights: undefined;
   Calendar: undefined;
 };
